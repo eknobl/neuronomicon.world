@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NEURONOMICON — Cinematic Universe</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --white:   #e8e8e8;
+      --dim:     rgba(232,232,232,0.4);
+      --dimmer:  rgba(232,232,232,0.18);
+      --faint:   rgba(232,232,232,0.07);
+    }
+
+    body {
+      background: #050505;
+      color: var(--white);
+      font-family: 'Share Tech Mono', 'Courier New', monospace;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* ── WebGL canvas ── */
+    #bg-canvas {
+      position: fixed;
+      inset: 0;
+      width: 100%; height: 100%;
+      z-index: 0;
+    }
+
+    /* ── Scanlines ── */
+    .scanlines {
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 3px,
+        rgba(0,0,0,0.07) 3px,
+        rgba(0,0,0,0.07) 4px
+      );
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    /* ── Vignette ── */
+    .vignette {
+      position: fixed;
+      inset: 0;
+      background: radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.65) 100%);
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    /* ── Content layer ── */
+    #app {
+      position: relative;
+      z-index: 2;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── HUD corners ── */
+    .hud-corner {
+      position: fixed;
+      width: 56px; height: 56px;
+      z-index: 20;
+      opacity: 0.5;
+    }
+    .hud-corner.tl { top: 18px; left: 18px;
+      border-top: 1px solid var(--white); border-left: 1px solid var(--white); }
+    .hud-corner.tr { top: 18px; right: 18px;
+      border-top: 1px solid var(--white); border-right: 1px solid var(--white); }
+    .hud-corner.bl { bottom: 18px; left: 18px;
+      border-bottom: 1px solid var(--white); border-left: 1px solid var(--white); }
+    .hud-corner.br { bottom: 18px; right: 18px;
+      border-bottom: 1px solid var(--white); border-right: 1px solid var(--white); }
+
+    /* Corner ticks */
+    .hud-corner.tl::after { content:''; position:absolute; top:-1px; left:12px; width:6px; height:1px; background:var(--white); }
+    .hud-corner.tr::after { content:''; position:absolute; top:-1px; right:12px; width:6px; height:1px; background:var(--white); }
+    .hud-corner.bl::after { content:''; position:absolute; bottom:-1px; left:12px; width:6px; height:1px; background:var(--white); }
+    .hud-corner.br::after { content:''; position:absolute; bottom:-1px; right:12px; width:6px; height:1px; background:var(--white); }
+
+    /* ── HUD status labels ── */
+    .hud-label {
+      position: fixed;
+      font-size: 9px;
+      letter-spacing: 2px;
+      color: var(--dimmer);
+      z-index: 20;
+      line-height: 1.7;
+      text-transform: uppercase;
+    }
+    .hud-label.tl { top: 22px; left: 84px; }
+    .hud-label.tr { top: 22px; right: 84px; text-align: right; }
+    .hud-label.bl { bottom: 22px; left: 84px; }
+    .hud-label.br { bottom: 22px; right: 84px; text-align: right; }
+
+    .blink { animation: blink 1.6s step-end infinite; }
+    @keyframes blink { 50% { opacity: 0; } }
+
+    /* ── Header ── */
+    header {
+      text-align: center;
+      padding: 90px 24px 48px;
+    }
+
+    .logo-wrap {
+      display: inline-block;
+      position: relative;
+    }
+
+    .logo {
+      font-family: 'Orbitron', sans-serif;
+      font-size: clamp(2.4rem, 9vw, 6.5rem);
+      font-weight: 900;
+      letter-spacing: 0.18em;
+      color: #fff;
+      position: relative;
+      display: inline-block;
+      text-shadow:
+        0 0 60px rgba(255,255,255,0.15),
+        0 0 120px rgba(255,255,255,0.05);
+      animation: logo-in 1.2s cubic-bezier(0.16,1,0.3,1) both;
+    }
+
+    @keyframes logo-in {
+      from { opacity: 0; letter-spacing: 0.5em; filter: blur(8px); }
+      to   { opacity: 1; letter-spacing: 0.18em; filter: blur(0); }
+    }
+
+    /* Glitch layers */
+    .logo::before,
+    .logo::after {
+      content: attr(data-text);
+      position: absolute;
+      inset: 0;
+      font-family: inherit;
+      font-size: inherit;
+      font-weight: inherit;
+      letter-spacing: inherit;
+      color: #fff;
+    }
+    .logo::before {
+      animation: glitch-1 7s infinite;
+      clip-path: polygon(0 0, 100% 0, 100% 38%, 0 38%);
+      transform: translate(-3px, 0);
+      opacity: 0.4;
+    }
+    .logo::after {
+      animation: glitch-2 7s infinite;
+      clip-path: polygon(0 60%, 100% 60%, 100% 100%, 0 100%);
+      transform: translate(3px, 0);
+      opacity: 0.4;
+    }
+
+    @keyframes glitch-1 {
+      0%,94%,100% { transform: translate(0); opacity:0; }
+      95%          { transform: translate(-4px,1px); opacity:0.5; filter: hue-rotate(180deg); }
+      96%          { transform: translate(4px,-1px); opacity:0.3; }
+      97%          { transform: translate(0); opacity:0; }
+    }
+    @keyframes glitch-2 {
+      0%,95%,100% { transform: translate(0); opacity:0; }
+      96%          { transform: translate(4px,-2px); opacity:0.4; filter: hue-rotate(-90deg); }
+      97%          { transform: translate(-2px,1px); opacity:0.3; }
+      98%          { transform: translate(0); opacity:0; }
+    }
+
+    .logo-sub {
+      font-size: 11px;
+      letter-spacing: 0.55em;
+      color: var(--dim);
+      margin-top: 14px;
+      text-transform: uppercase;
+      animation: fade-in 1.8s both;
+    }
+
+    .logo-rule {
+      width: 180px;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent);
+      margin: 22px auto 0;
+      animation: rule-in 2s both;
+    }
+
+    @keyframes fade-in { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:none; } }
+    @keyframes rule-in { from { width:0; opacity:0; } to { width:180px; opacity:1; } }
+
+    /* ── Section header ── */
+    .section-header {
+      font-size: 10px;
+      letter-spacing: 5px;
+      color: var(--dimmer);
+      text-align: center;
+      margin-bottom: 36px;
+      text-transform: uppercase;
+    }
+    .section-header::before { content: '⟨ '; }
+    .section-header::after  { content: ' ⟩'; }
+
+    /* ── Projects ── */
+    .projects {
+      padding: 16px 48px 72px;
+      max-width: 1080px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .project-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 20px;
+    }
+
+    /* ── Card ── */
+    .card {
+      --c: #fff;
+      position: relative;
+      background: rgba(5,5,5,0.82);
+      border: 1px solid rgba(255,255,255,0.1);
+      padding: 28px 28px 24px;
+      overflow: hidden;
+      transition: border-color 0.3s ease, box-shadow 0.3s ease;
+      animation: card-in 0.7s cubic-bezier(0.16,1,0.3,1) both;
+    }
+
+    .card:nth-child(1) { animation-delay: 0.1s; }
+    .card:nth-child(2) { animation-delay: 0.2s; }
+    .card:nth-child(3) { animation-delay: 0.3s; }
+    .card:nth-child(4) { animation-delay: 0.4s; }
+
+    @keyframes card-in {
+      from { opacity:0; transform:translateY(24px); }
+      to   { opacity:1; transform:none; }
+    }
+
+    .card:hover {
+      border-color: var(--c);
+      box-shadow: 0 0 32px color-mix(in srgb, var(--c) 18%, transparent);
+    }
+
+    /* Top accent bar */
+    .card-bar {
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+      background: var(--c);
+      box-shadow: 0 0 14px var(--c);
+      opacity: 0.85;
+    }
+
+    /* Hover glow fill */
+    .card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: var(--c);
+      opacity: 0;
+      transition: opacity 0.3s;
+      pointer-events: none;
+    }
+    .card:hover::before { opacity: 0.03; }
+
+    .card-status-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 18px;
+    }
+
+    .status-pill {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .status-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--c);
+      box-shadow: 0 0 8px var(--c);
+      animation: pulse 2.4s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%,100% { opacity:1; transform:scale(1); }
+      50%      { opacity:0.45; transform:scale(0.7); }
+    }
+
+    .status-text {
+      font-size: 9px;
+      letter-spacing: 3px;
+      color: var(--c);
+      opacity: 0.85;
+    }
+
+    .card-id {
+      font-size: 9px;
+      letter-spacing: 2px;
+      color: var(--dimmer);
+    }
+
+    .card-title {
+      font-family: 'Orbitron', sans-serif;
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      color: #fff;
+      margin-bottom: 7px;
+      line-height: 1.2;
+    }
+
+    .card-tagline {
+      font-size: 11px;
+      letter-spacing: 1px;
+      color: var(--dim);
+      line-height: 1.7;
+      margin-bottom: 18px;
+    }
+
+    .tag-row { margin-bottom: 6px; }
+    .tag {
+      display: inline-block;
+      padding: 2px 9px;
+      border: 1px solid rgba(255,255,255,0.12);
+      font-size: 8px;
+      letter-spacing: 2px;
+      color: var(--dimmer);
+      margin-right: 5px;
+      margin-bottom: 5px;
+    }
+
+    .card-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 18px;
+      padding: 9px 20px;
+      border: 1px solid var(--c);
+      color: var(--c);
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 10px;
+      letter-spacing: 4px;
+      text-decoration: none;
+      text-transform: uppercase;
+      transition: background 0.2s, color 0.2s, box-shadow 0.2s;
+      cursor: pointer;
+    }
+
+    .card-btn:hover {
+      background: var(--c);
+      color: #000;
+      box-shadow: 0 0 20px color-mix(in srgb, var(--c) 40%, transparent);
+    }
+
+    .card-btn .arrow { transition: transform 0.2s; }
+    .card-btn:hover .arrow { transform: translateX(4px); }
+
+    /* ── Footer ── */
+    footer {
+      margin-top: auto;
+      padding: 48px 40px 36px;
+      text-align: center;
+    }
+
+    .footer-rule {
+      width: 320px;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
+      margin: 0 auto 32px;
+    }
+
+    .socials {
+      display: flex;
+      justify-content: center;
+      gap: 40px;
+      margin-bottom: 28px;
+    }
+
+    .social {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      color: var(--dim);
+      text-decoration: none;
+      font-size: 10px;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      transition: color 0.2s;
+    }
+    .social:hover { color: #fff; }
+    .social svg { width: 16px; height: 16px; fill: currentColor; flex-shrink: 0; }
+
+    .footer-copy {
+      font-size: 9px;
+      letter-spacing: 3px;
+      color: var(--dimmer);
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 600px) {
+      .projects { padding: 16px 20px 60px; }
+      .hud-label { display: none; }
+      header { padding: 70px 16px 40px; }
+      .socials { gap: 24px; }
+    }
+  </style>
+</head>
+<body>
+
+<canvas id="bg-canvas"></canvas>
+<div class="scanlines"></div>
+<div class="vignette"></div>
+
+<!-- HUD frame -->
+<div class="hud-corner tl"></div>
+<div class="hud-corner tr"></div>
+<div class="hud-corner bl"></div>
+<div class="hud-corner br"></div>
+
+<div class="hud-label tl">
+  NEURONOMICON.WORLD<br>
+  <span class="blink">■</span>&nbsp;SIGNAL LOCKED
+</div>
+<div class="hud-label tr">
+  NODES ONLINE: <span id="hud-nodes">—</span><br>
+  STATUS: ACTIVE
+</div>
+<div class="hud-label bl">BUILD v1.0 &nbsp;/&nbsp; 2026</div>
+<div class="hud-label br" id="hud-cursor">X: ——&nbsp;&nbsp;Y: ——</div>
+
+<!-- ──────────────────────────────────── APP ── -->
+<div id="app">
+
+  <header>
+    <div class="logo-wrap">
+      <div class="logo" data-text="NEURONOMICON">NEURONOMICON</div>
+    </div>
+    <div class="logo-sub">Cinematic Universe</div>
+    <div class="logo-rule"></div>
+  </header>
+
+  <main class="projects">
+    <p class="section-header">Active Transmissions</p>
+    <div class="project-grid" id="grid"></div>
+  </main>
+
+  <footer>
+    <div class="footer-rule"></div>
+    <div class="socials">
+
+      <a class="social" href="https://x.com/Erik_Knobl" target="_blank" rel="noopener">
+        <!-- X / Twitter -->
+        <svg viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.746l7.73-8.835L1.254 2.25H8.08l4.253 5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+        @Erik_Knobl
+      </a>
+
+      <a class="social" href="https://www.youtube.com/@NeuronomiconTV" target="_blank" rel="noopener">
+        <!-- YouTube -->
+        <svg viewBox="0 0 24 24"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
+        NeuronomiconTV
+      </a>
+
+    </div>
+    <div class="footer-copy">© 2026 NEURONOMICON — ALL RIGHTS RESERVED</div>
+  </footer>
+
+</div><!-- /app -->
+
+<!-- ══════════════════════════════ SCRIPTS ══ -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+'use strict';
+
+// ──────────────────────────────────────────────────────────────────
+//  DATA  — add projects here; the page is fully data-driven
+// ──────────────────────────────────────────────────────────────────
+const PROJECTS = [
+  {
+    id:      'NMC-001',
+    title:   'STAR WYRMS',
+    tagline: 'Top Gun × Attack on Titan × Space Dragons',
+    tags:    ['MILITARY SCI-FI', 'PROGRESSION', 'SPACE OPERA'],
+    color:   '#4fc3f7',   // sky-blue — orbital / aerial
+    url:     'https://www.royalroad.com/fiction/146773/star-wyrms-top-gun-attack-on-titan-space-dragons',
+    status:  'ONLINE',
+  },
+  {
+    id:      'NMC-002',
+    title:   'GRIND FIGHTER',
+    tagline: 'Hunger Games × Gladiator × Ghost in the Shell',
+    tags:    ['CYBERPUNK', 'ARENA', 'PROGRESSION'],
+    color:   '#ff8c42',   // ember-orange — arena fire
+    url:     'https://www.royalroad.com/fiction/138724/grind-fighter-hunger-games-gladiator-ghost-in',
+    status:  'ONLINE',
+  },
+  // Future entries — uncomment and fill when ready:
+  // {
+  //   id: 'NMC-003', title: 'PROJECT NAME', tagline: '...', tags: [],
+  //   color: '#a78bfa', url: null, status: 'INCOMING',
+  // },
+];
+
+
+// ──────────────────────────────────────────────────────────────────
+//  BUILD CARDS
+// ──────────────────────────────────────────────────────────────────
+const grid = document.getElementById('grid');
+
+PROJECTS.forEach(p => {
+  const online  = p.status === 'ONLINE';
+  const card    = document.createElement('div');
+  card.className = 'card' + (online ? '' : ' card--dim');
+  card.style.setProperty('--c', p.color);
+
+  const tags = p.tags.map(t => `<span class="tag">${t}</span>`).join('');
+  const btn  = online
+    ? `<a class="card-btn" href="${p.url}" target="_blank" rel="noopener">
+         READ <span class="arrow">→</span>
+       </a>`
+    : `<span class="card-btn" style="opacity:.3;cursor:default;pointer-events:none">
+         INCOMING <span class="arrow">—</span>
+       </span>`;
+
+  card.innerHTML = `
+    <div class="card-bar"></div>
+    <div class="card-status-row">
+      <div class="status-pill">
+        <div class="status-dot"></div>
+        <span class="status-text">${p.status}</span>
+      </div>
+      <div class="card-id">// ${p.id}</div>
+    </div>
+    <div class="card-title">${p.title}</div>
+    <div class="card-tagline">${p.tagline}</div>
+    <div class="tag-row">${tags}</div>
+    ${btn}
+  `;
+  grid.appendChild(card);
+});
+
+document.getElementById('hud-nodes').textContent =
+  PROJECTS.filter(p => p.status === 'ONLINE').length;
+
+
+// ──────────────────────────────────────────────────────────────────
+//  THREE.JS  — particle network WebGL background
+// ──────────────────────────────────────────────────────────────────
+const canvas   = document.getElementById('bg-canvas');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setClearColor(0x000000, 0);
+
+const scene  = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 1000);
+camera.position.set(0, 0, 130);
+
+// -- Particles --
+const COUNT = 200;
+const posArr = new Float32Array(COUNT * 3);
+const vel    = [];
+
+for (let i = 0; i < COUNT; i++) {
+  posArr[i*3]   = (Math.random() - 0.5) * 320;
+  posArr[i*3+1] = (Math.random() - 0.5) * 210;
+  posArr[i*3+2] = (Math.random() - 0.5) * 110;
+  vel.push(
+    (Math.random() - 0.5) * 0.07,
+    (Math.random() - 0.5) * 0.07,
+    (Math.random() - 0.5) * 0.025
+  );
+}
+
+const ptGeo = new THREE.BufferGeometry();
+ptGeo.setAttribute('position', new THREE.BufferAttribute(posArr, 3));
+
+const ptMat = new THREE.PointsMaterial({
+  color: 0xffffff,
+  size: 0.9,
+  transparent: true,
+  opacity: 0.65,
+  sizeAttenuation: true,
+});
+
+scene.add(new THREE.Points(ptGeo, ptMat));
+
+// -- Lines --
+const LINK_DIST = 55;
+const lineMat = new THREE.LineBasicMaterial({
+  color: 0xffffff,
+  transparent: true,
+  opacity: 0.07,
+});
+
+let lineObj = null;
+
+function rebuildLines() {
+  const p   = posArr;
+  const pts = [];
+
+  for (let i = 0; i < COUNT; i++) {
+    for (let j = i + 1; j < COUNT; j++) {
+      const dx = p[i*3]   - p[j*3];
+      const dy = p[i*3+1] - p[j*3+1];
+      const dz = p[i*3+2] - p[j*3+2];
+      if (dx*dx + dy*dy + dz*dz < LINK_DIST * LINK_DIST) {
+        pts.push(p[i*3], p[i*3+1], p[i*3+2],
+                 p[j*3], p[j*3+1], p[j*3+2]);
+      }
+    }
+  }
+
+  if (lineObj) {
+    scene.remove(lineObj);
+    lineObj.geometry.dispose();
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pts), 3));
+  lineObj = new THREE.LineSegments(geo, lineMat);
+  scene.add(lineObj);
+}
+
+// -- Mouse parallax --
+let mx = 0, my = 0;
+const hudCursor = document.getElementById('hud-cursor');
+
+window.addEventListener('mousemove', e => {
+  mx = (e.clientX / window.innerWidth  - 0.5) * 2;
+  my = (e.clientY / window.innerHeight - 0.5) * 2;
+  hudCursor.textContent =
+    'X: ' + String(e.clientX).padStart(4,'0') +
+    '  Y: ' + String(e.clientY).padStart(4,'0');
+});
+
+// -- Animate --
+let frame = 0;
+(function animate() {
+  requestAnimationFrame(animate);
+  frame++;
+
+  const p = posArr;
+  for (let i = 0; i < COUNT; i++) {
+    p[i*3]   += vel[i*3];
+    p[i*3+1] += vel[i*3+1];
+    p[i*3+2] += vel[i*3+2];
+
+    if (p[i*3]   >  160) p[i*3]   = -160;
+    if (p[i*3]   < -160) p[i*3]   =  160;
+    if (p[i*3+1] >  105) p[i*3+1] = -105;
+    if (p[i*3+1] < -105) p[i*3+1] =  105;
+    if (p[i*3+2] >   55) p[i*3+2] =  -55;
+    if (p[i*3+2] <  -55) p[i*3+2] =   55;
+  }
+  ptGeo.attributes.position.needsUpdate = true;
+
+  if (frame % 4 === 0) rebuildLines();
+
+  camera.position.x += (mx * 18 - camera.position.x) * 0.018;
+  camera.position.y += (-my * 12 - camera.position.y) * 0.018;
+  camera.lookAt(scene.position);
+
+  renderer.render(scene, camera);
+})();
+
+// -- Resize --
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+</script>
+</body>
+</html>
