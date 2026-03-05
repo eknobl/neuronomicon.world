@@ -3,679 +3,848 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>NEURONOMICON — Cinematic Universe</title>
+  <title>NEURONOMICON — Sci-Fi Universe</title>
+  <meta name="description" content="Humanity built artificial gods to conquer the stars. They never explained why.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Kode+Mono:wght@400;700&family=Roboto:wght@400;500;900&display=swap" rel="stylesheet">
   <style>
-    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
 
+    /* ===========================
+       CUSTOM PROPERTIES
+    =========================== */
     :root {
-      --white:   #e8e8e8;
-      --dim:     rgba(232,232,232,0.4);
-      --dimmer:  rgba(232,232,232,0.18);
-      --faint:   rgba(232,232,232,0.07);
+      --red:       #ff0000;
+      --steel:     #7184a0;
+      --white:     #ffffff;
+      --bg:        #000000;
+      --sidebar-w: 46px;
+      --mono:      'Kode Mono', 'Courier New', monospace;
+      --body:      'Roboto', sans-serif;
+    }
+
+    /* ===========================
+       RESET
+    =========================== */
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
     }
 
     body {
-      background: #050505;
+      background: var(--bg);
       color: var(--white);
-      font-family: 'Share Tech Mono', 'Courier New', monospace;
-      min-height: 100vh;
+      font-family: var(--body);
       overflow-x: hidden;
     }
 
-    /* ── WebGL canvas ── */
-    #bg-canvas {
+    a { text-decoration: none; color: inherit; }
+
+    /* ===========================
+       SIDEBAR
+    =========================== */
+    .sidebar {
       position: fixed;
-      inset: 0;
-      width: 100%; height: 100%;
-      z-index: 0;
+      top: 0;
+      left: 0;
+      width: var(--sidebar-w);
+      height: 100vh;
+      background: var(--white);
+      z-index: 100;
     }
 
-    /* ── Scanlines ── */
-    .scanlines {
-      position: fixed;
-      inset: 0;
-      background: repeating-linear-gradient(
-        0deg,
-        transparent,
-        transparent 3px,
-        rgba(0,0,0,0.07) 3px,
-        rgba(0,0,0,0.07) 4px
-      );
-      pointer-events: none;
-      z-index: 1;
-    }
-
-    /* ── Vignette ── */
-    .vignette {
-      position: fixed;
-      inset: 0;
-      background: radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.65) 100%);
-      pointer-events: none;
-      z-index: 1;
-    }
-
-    /* ── Content layer ── */
-    #app {
-      position: relative;
-      z-index: 2;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-    }
-
-    /* ── HUD corners ── */
-    .hud-corner {
-      position: fixed;
-      width: 56px; height: 56px;
-      z-index: 20;
-      opacity: 0.5;
-    }
-    .hud-corner.tl { top: 18px; left: 18px;
-      border-top: 1px solid var(--white); border-left: 1px solid var(--white); }
-    .hud-corner.tr { top: 18px; right: 18px;
-      border-top: 1px solid var(--white); border-right: 1px solid var(--white); }
-    .hud-corner.bl { bottom: 18px; left: 18px;
-      border-bottom: 1px solid var(--white); border-left: 1px solid var(--white); }
-    .hud-corner.br { bottom: 18px; right: 18px;
-      border-bottom: 1px solid var(--white); border-right: 1px solid var(--white); }
-
-    /* Corner ticks */
-    .hud-corner.tl::after { content:''; position:absolute; top:-1px; left:12px; width:6px; height:1px; background:var(--white); }
-    .hud-corner.tr::after { content:''; position:absolute; top:-1px; right:12px; width:6px; height:1px; background:var(--white); }
-    .hud-corner.bl::after { content:''; position:absolute; bottom:-1px; left:12px; width:6px; height:1px; background:var(--white); }
-    .hud-corner.br::after { content:''; position:absolute; bottom:-1px; right:12px; width:6px; height:1px; background:var(--white); }
-
-    /* ── HUD status labels ── */
-    .hud-label {
-      position: fixed;
-      font-size: 9px;
-      letter-spacing: 2px;
-      color: var(--dimmer);
-      z-index: 20;
-      line-height: 1.7;
-      text-transform: uppercase;
-    }
-    .hud-label.tl { top: 22px; left: 84px; }
-    .hud-label.tr { top: 22px; right: 84px; text-align: right; }
-    .hud-label.bl { bottom: 22px; left: 84px; }
-    .hud-label.br { bottom: 22px; right: 84px; text-align: right; }
-
-    .blink { animation: blink 1.6s step-end infinite; }
-    @keyframes blink { 50% { opacity: 0; } }
-
-    /* ── Header ── */
-    header {
-      text-align: center;
-      padding: 90px 24px 48px;
-    }
-
-    .logo-wrap {
-      display: inline-block;
-      position: relative;
-    }
-
-    .logo {
-      font-family: 'Orbitron', sans-serif;
-      font-size: clamp(2.4rem, 9vw, 6.5rem);
-      font-weight: 900;
-      letter-spacing: 0.18em;
-      color: #fff;
-      position: relative;
-      display: inline-block;
-      text-shadow:
-        0 0 60px rgba(255,255,255,0.15),
-        0 0 120px rgba(255,255,255,0.05);
-      animation: logo-in 1.2s cubic-bezier(0.16,1,0.3,1) both;
-    }
-
-    @keyframes logo-in {
-      from { opacity: 0; letter-spacing: 0.5em; filter: blur(8px); }
-      to   { opacity: 1; letter-spacing: 0.18em; filter: blur(0); }
-    }
-
-    /* Glitch layers */
-    .logo::before,
-    .logo::after {
-      content: attr(data-text);
+    .sidebar-star {
       position: absolute;
-      inset: 0;
-      font-family: inherit;
-      font-size: inherit;
-      font-weight: inherit;
-      letter-spacing: inherit;
-      color: #fff;
-    }
-    .logo::before {
-      animation: glitch-1 7s infinite;
-      clip-path: polygon(0 0, 100% 0, 100% 38%, 0 38%);
-      transform: translate(-3px, 0);
-      opacity: 0.4;
-    }
-    .logo::after {
-      animation: glitch-2 7s infinite;
-      clip-path: polygon(0 60%, 100% 60%, 100% 100%, 0 100%);
-      transform: translate(3px, 0);
-      opacity: 0.4;
+      top: 12px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: var(--bg);
+      font-family: var(--mono);
+      font-size: 16px;
+      line-height: 1;
     }
 
-    @keyframes glitch-1 {
-      0%,94%,100% { transform: translate(0); opacity:0; }
-      95%          { transform: translate(-4px,1px); opacity:0.5; filter: hue-rotate(180deg); }
-      96%          { transform: translate(4px,-1px); opacity:0.3; }
-      97%          { transform: translate(0); opacity:0; }
-    }
-    @keyframes glitch-2 {
-      0%,95%,100% { transform: translate(0); opacity:0; }
-      96%          { transform: translate(4px,-2px); opacity:0.4; filter: hue-rotate(-90deg); }
-      97%          { transform: translate(-2px,1px); opacity:0.3; }
-      98%          { transform: translate(0); opacity:0; }
-    }
-
-    .logo-sub {
-      font-size: 11px;
-      letter-spacing: 0.55em;
-      color: var(--dim);
-      margin-top: 14px;
-      text-transform: uppercase;
-      animation: fade-in 1.8s both;
-    }
-
-    .logo-rule {
-      width: 180px;
-      height: 1px;
-      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent);
-      margin: 22px auto 0;
-      animation: rule-in 2s both;
-    }
-
-    @keyframes fade-in { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:none; } }
-    @keyframes rule-in { from { width:0; opacity:0; } to { width:180px; opacity:1; } }
-
-    /* ── Section header ── */
-    .section-header {
-      font-size: 10px;
-      letter-spacing: 5px;
-      color: var(--dimmer);
-      text-align: center;
-      margin-bottom: 36px;
-      text-transform: uppercase;
-    }
-    .section-header::before { content: '⟨ '; }
-    .section-header::after  { content: ' ⟩'; }
-
-    /* ── Projects ── */
-    .projects {
-      padding: 16px 48px 72px;
-      max-width: 1080px;
-      margin: 0 auto;
+    .sidebar-stripes {
+      position: absolute;
+      top: 426px;
+      left: 0;
       width: 100%;
     }
 
-    .project-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-      gap: 20px;
+    .stripe { width: 100%; height: 10px; }
+    .s-black { background: var(--bg); }
+    .s-blue  { background: var(--steel); }
+
+    /* Rotated STARDATE:::2233 text */
+    .sidebar-label {
+      position: absolute;
+      top: 605px;          /* vertical center of the 277-px text run */
+      left: 50%;
+      transform: translate(-50%, -50%) rotate(-90deg);
+      white-space: nowrap;
+      font-family: var(--mono);
+      font-size: 20px;
+      font-weight: 400;
+      line-height: 1;
+      color: var(--bg);
     }
 
-    /* ── Card ── */
-    .card {
-      --c: #fff;
+    .sl-stardate { color: var(--steel); }
+    .sl-sep      { color: var(--bg); }
+    .sl-year     { color: var(--red); }
+
+    /* ===========================
+       MAIN CONTENT
+    =========================== */
+    .main-content { margin-left: var(--sidebar-w); }
+
+    /* ===========================
+       HERO
+    =========================== */
+    .hero {
       position: relative;
-      background: rgba(5,5,5,0.82);
-      border: 1px solid rgba(255,255,255,0.1);
-      padding: 28px 28px 24px;
+      height: 765px;
       overflow: hidden;
-      transition: border-color 0.3s ease, box-shadow 0.3s ease;
-      animation: card-in 0.7s cubic-bezier(0.16,1,0.3,1) both;
+      background: var(--bg);
     }
 
-    .card:nth-child(1) { animation-delay: 0.1s; }
-    .card:nth-child(2) { animation-delay: 0.2s; }
-    .card:nth-child(3) { animation-delay: 0.3s; }
-    .card:nth-child(4) { animation-delay: 0.4s; }
-
-    @keyframes card-in {
-      from { opacity:0; transform:translateY(24px); }
-      to   { opacity:1; transform:none; }
-    }
-
-    .card:hover {
-      border-color: var(--c);
-      box-shadow: 0 0 32px color-mix(in srgb, var(--c) 18%, transparent);
-    }
-
-    /* Top accent bar */
-    .card-bar {
+    /* Black top bar + red corner block */
+    .hero-topbar {
       position: absolute;
       top: 0; left: 0; right: 0;
-      height: 2px;
-      background: var(--c);
-      box-shadow: 0 0 14px var(--c);
-      opacity: 0.85;
+      height: 46px;
+      background: var(--bg);
+      z-index: 10;
+      display: flex;
+      justify-content: flex-end;
     }
 
-    /* Hover glow fill */
-    .card::before {
+    .hero-topbar-red {
+      width: 162px;
+      height: 46px;
+      background: var(--red);
+      flex-shrink: 0;
+    }
+
+    /* Hero image */
+    .hero-image-wrap {
+      position: absolute;
+      top: 46px; left: 0; right: 0; bottom: 0;
+    }
+
+    .hero-img {
+      width: 100%; height: 100%;
+      object-fit: cover;
+      object-position: center top;
+      display: block;
+    }
+
+    /* Top-left corner bracket (white) */
+    .bracket-tl {
+      position: absolute;
+      top: 70px; left: 21px;
+      width: 34px; height: 34px;
+      z-index: 5;
+    }
+    .bracket-tl::before, .bracket-tl::after {
       content: '';
       position: absolute;
-      inset: 0;
-      background: var(--c);
-      opacity: 0;
-      transition: opacity 0.3s;
-      pointer-events: none;
+      background: var(--white);
     }
-    .card:hover::before { opacity: 0.03; }
+    .bracket-tl::before { top: 0; left: 0; width: 34px; height: 3px; }
+    .bracket-tl::after  { top: 0; left: 0; width: 3px; height: 34px; }
 
-    .card-status-row {
+    /* Decorative symbol row */
+    .hero-decos {
+      position: absolute;
+      top: 409px; left: 44px; right: 44px;
       display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 18px;
+      align-items: baseline;
+      z-index: 5;
     }
 
-    .status-pill {
-      display: flex;
-      align-items: center;
-      gap: 7px;
+    .deco {
+      font-family: var(--mono);
+      font-size: clamp(32px, 3.5vw, 50px);
+      color: var(--white);
+      line-height: 1;
     }
+    .deco-plus   { margin-right: 80px; }
+    .deco-arrows { margin-right: auto; }
 
-    .status-dot {
-      width: 6px; height: 6px;
-      border-radius: 50%;
-      background: var(--c);
-      box-shadow: 0 0 8px var(--c);
-      animation: pulse 2.4s ease-in-out infinite;
-    }
-
-    @keyframes pulse {
-      0%,100% { opacity:1; transform:scale(1); }
-      50%      { opacity:0.45; transform:scale(0.7); }
-    }
-
-    .status-text {
-      font-size: 9px;
-      letter-spacing: 3px;
-      color: var(--c);
-      opacity: 0.85;
-    }
-
-    .card-id {
-      font-size: 9px;
-      letter-spacing: 2px;
-      color: var(--dimmer);
-    }
-
-    .card-title {
-      font-family: 'Orbitron', sans-serif;
-      font-size: 1.25rem;
+    /* Site title */
+    .hero-title {
+      position: absolute;
+      top: 520px; left: 44px;
+      font-family: var(--mono);
       font-weight: 700;
-      letter-spacing: 0.06em;
-      color: #fff;
-      margin-bottom: 7px;
-      line-height: 1.2;
+      font-size: clamp(44px, 6.5vw, 94px);
+      color: var(--white);
+      letter-spacing: -0.05em;
+      line-height: 1;
+      z-index: 5;
     }
 
-    .card-tagline {
+    /* Tri-colon divider */
+    .hero-tricolon {
+      position: absolute;
+      top: 640px; left: 48px;
+      font-family: var(--mono);
       font-size: 11px;
-      letter-spacing: 1px;
-      color: var(--dim);
-      line-height: 1.7;
-      margin-bottom: 18px;
+      color: var(--steel);
+      z-index: 5;
     }
 
-    .tag-row { margin-bottom: 6px; }
-    .tag {
-      display: inline-block;
-      padding: 2px 9px;
-      border: 1px solid rgba(255,255,255,0.12);
-      font-size: 8px;
-      letter-spacing: 2px;
-      color: var(--dimmer);
-      margin-right: 5px;
-      margin-bottom: 5px;
+    /* Tagline */
+    .hero-tagline {
+      position: absolute;
+      top: 658px; left: 48px;
+      font-weight: 500;
+      font-size: clamp(13px, 1.4vw, 20px);
+      color: var(--white);
+      line-height: 1.55;
+      max-width: 793px;
+      z-index: 5;
     }
 
-    .card-btn {
-      display: inline-flex;
-      align-items: center;
+    /* ===========================
+       UNIVERSE HUB
+    =========================== */
+    .universe-hub {
+      display: grid;
+      grid-template-columns: 46fr 19fr 19fr;
+      min-height: 358px;
+    }
+
+    .hub-newsletter {
+      background: linear-gradient(45deg, #000 70%, #7184a0 130%);
+      padding: 22px 22px 28px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      position: relative;
+    }
+
+    .hub-label {
+      font-family: var(--mono);
+      font-size: 18px;
+      font-weight: 400;
+      color: var(--white);
+      margin-bottom: 10px;
+    }
+
+    .hub-big-link {
+      font-weight: 900;
+      font-size: clamp(26px, 3.8vw, 55px);
+      line-height: 1;
+      color: var(--white);
+      display: block;
+      transition: opacity .2s;
+    }
+    .hub-big-link:hover { opacity: 0.8; }
+
+    .hub-subtitle {
+      font-weight: 500;
+      font-size: clamp(13px, 1.4vw, 20px);
+      color: var(--white);
+    }
+
+    /* Corner bracket bottom-right of newsletter tile */
+    .bracket-br {
+      position: absolute;
+      bottom: 56px; right: -44px;
+      width: 35px; height: 35px;
+      z-index: 2;
+    }
+    .bracket-br::before, .bracket-br::after {
+      content: '';
+      position: absolute;
+      background: var(--white);
+    }
+    .bracket-br::before { bottom: 0; right: 0; width: 35px; height: 3px; }
+    .bracket-br::after  { bottom: 0; right: 0; width: 3px; height: 35px; }
+
+    /* 2×2 nav tile grid */
+    .hub-grid {
+      grid-column: span 2;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: 1fr 1fr;
+    }
+
+    .hub-tile {
+      background: linear-gradient(45deg, #000 70%, #7184a0 130%);
+      padding: 18px 22px 20px;
+      display: flex;
+      flex-direction: column;
       gap: 8px;
-      margin-top: 18px;
-      padding: 9px 20px;
-      border: 1px solid var(--c);
-      color: var(--c);
-      font-family: 'Share Tech Mono', monospace;
-      font-size: 10px;
-      letter-spacing: 4px;
-      text-decoration: none;
-      text-transform: uppercase;
-      transition: background 0.2s, color 0.2s, box-shadow 0.2s;
+      border-left: 1px solid #111;
+      border-top: 1px solid #111;
+      transition: background .2s;
       cursor: pointer;
     }
+    .hub-tile:hover { background: linear-gradient(45deg, #0a0a0a 50%, #7184a0 115%); }
 
-    .card-btn:hover {
-      background: var(--c);
-      color: #000;
-      box-shadow: 0 0 20px color-mix(in srgb, var(--c) 40%, transparent);
+    .tricolon {
+      font-family: var(--mono);
+      font-size: 11px;
+      color: var(--steel);
+      letter-spacing: 1px;
     }
 
-    .card-btn .arrow { transition: transform 0.2s; }
-    .card-btn:hover .arrow { transform: translateX(4px); }
-
-    /* ── Footer ── */
-    footer {
-      margin-top: auto;
-      padding: 48px 40px 36px;
-      text-align: center;
+    .hub-tile-title {
+      font-family: var(--mono);
+      font-weight: 700;
+      font-size: clamp(18px, 2vw, 30px);
+      color: var(--white);
+      text-transform: uppercase;
     }
 
-    .footer-rule {
-      width: 320px;
-      height: 1px;
-      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.15), transparent);
-      margin: 0 auto 32px;
+    .hub-tile-sub {
+      font-size: 12px;
+      color: var(--white);
+      text-transform: uppercase;
+      opacity: 0.9;
     }
 
-    .socials {
+    /* ===========================
+       STORY IMAGE STRIP
+    =========================== */
+    .stories-images {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      height: 361px;
+    }
+
+    .story-img-panel { overflow: hidden; }
+
+    .story-img-panel img {
+      width: 100%; height: 100%;
+      object-fit: cover;
+      object-position: center;
+      display: block;
+      transition: transform .45s ease;
+    }
+    .story-img-panel:hover img { transform: scale(1.05); }
+
+    /* ===========================
+       STORIES CTA
+    =========================== */
+    .stories-cta {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+    }
+
+    .story-col {
+      background: linear-gradient(37deg, #000 70%, #7184a0 130%);
+      padding: 14px 22px 22px;
+      border-right: 1px solid #0d0d0d;
+    }
+
+    .story-tagline {
+      font-size: 12px;
+      color: var(--white);
+      text-transform: uppercase;
+      line-height: 1.5;
+      margin-bottom: 10px;
+      min-height: 40px;
+    }
+
+    .story-title {
+      font-family: var(--mono);
+      font-weight: 700;
+      font-size: clamp(16px, 2vw, 30px);
+      color: var(--white);
+      text-transform: uppercase;
+      margin-bottom: 16px;
+    }
+
+    .story-btn-row {
       display: flex;
+      align-items: stretch;
+      width: 158px;
+      height: 41px;
+    }
+
+    .btn-stripe {
+      display: block;
+      width: 10px;
+      flex-shrink: 0;
+    }
+    .btn-stripe.blue  { background: var(--steel); }
+    .btn-stripe.black { background: var(--bg); }
+
+    .story-btn {
+      display: flex;
+      align-items: center;
       justify-content: center;
-      gap: 40px;
+      flex: 1;
+      background: var(--red);
+      color: var(--white);
+      font-family: var(--body);
+      font-weight: 900;
+      font-size: 11px;
+      text-transform: uppercase;
+      text-align: center;
+      letter-spacing: 0.3px;
+      border: none;
+      cursor: pointer;
+      padding: 0 6px;
+      line-height: 1.2;
+      transition: filter .2s;
+    }
+    .story-btn:hover:not(:disabled) { filter: brightness(1.15); }
+    .story-btn:disabled {
+      opacity: 0.5;
+      cursor: default;
+    }
+
+    /* ===========================
+       QUOTE SECTION
+    =========================== */
+    .quote-section {
+      background: linear-gradient(27deg, #000 70%, #7184a0 130%);
+      padding: 55px 90px 70px;
+      position: relative;
+    }
+
+    .quote-label {
+      font-family: var(--mono);
+      font-size: 18px;
+      color: var(--white);
+      text-transform: uppercase;
       margin-bottom: 28px;
     }
 
-    .social {
+    .quote-text {
+      font-weight: 900;
+      font-size: clamp(30px, 5.1vw, 74px);
+      line-height: 0.9;
+      color: var(--white);
+      text-transform: uppercase;
+      max-width: 1280px;
+    }
+
+    /* Red bracket bottom-left */
+    .bracket-bl-red {
+      position: absolute;
+      bottom: 42px; left: 90px;
+      width: 35px; height: 35px;
+    }
+    .bracket-bl-red::before, .bracket-bl-red::after {
+      content: '';
+      position: absolute;
+      background: var(--red);
+    }
+    .bracket-bl-red::before { bottom: 0; left: 0; width: 35px; height: 4px; }
+    .bracket-bl-red::after  { bottom: 0; left: 0; width: 4px; height: 35px; }
+
+    /* ===========================
+       NARRATIVE SECTION
+    =========================== */
+    .narrative-section {
+      display: grid;
+      grid-template-columns: 2fr 1fr 1fr;
+      min-height: 358px;
+    }
+
+    .narrative-text-block {
+      background: linear-gradient(27deg, #000 70%, #7184a0 130%);
+      padding: 32px 44px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      gap: 18px;
+    }
+
+    .narrative-body {
+      font-size: clamp(13px, 1.25vw, 18px);
+      color: var(--white);
+      text-transform: uppercase;
+      line-height: 1.7;
+    }
+
+    .narrative-panel {
+      background: linear-gradient(45deg, #000 70%, #7184a0 130%);
+      border-left: 1px solid #111;
+      min-height: 179px;
+      position: relative;
+    }
+
+    /* Arrow indicator in first narrative panel */
+    .arrow-br {
+      position: absolute;
+      bottom: 22px; right: 22px;
+      width: 30px; height: 30px;
+    }
+    .arrow-br::before, .arrow-br::after {
+      content: '';
+      position: absolute;
+      background: var(--red);
+    }
+    .arrow-br::before { bottom: 0; right: 0; width: 30px; height: 4px; }
+    .arrow-br::after  { bottom: 0; right: 0; width: 4px; height: 30px; }
+
+    /* ===========================
+       SOCIAL SECTION
+    =========================== */
+    .social-section {
+      display: grid;
+      grid-template-columns: 2fr 2fr;
+      min-height: 179px;
+    }
+
+    /* Diagonal red stripes wedge */
+    .social-stripes {
+      position: relative;
+      overflow: hidden;
+      background: var(--bg);
+      min-height: 179px;
+    }
+    .social-stripes::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: repeating-linear-gradient(
+        -45deg,
+        var(--red)  0px,
+        var(--red)  14px,
+        transparent 14px,
+        transparent 32px
+      );
+      clip-path: polygon(0 100%, 100% 100%, 0 0);
+    }
+
+    .social-content {
+      background: linear-gradient(27deg, #000 70%, #7184a0 130%);
+      padding: 22px 30px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      gap: 12px;
+    }
+
+    .social-heading {
+      font-family: var(--mono);
+      font-weight: 700;
+      font-size: clamp(18px, 2vw, 30px);
+      text-transform: uppercase;
+      color: var(--white);
+    }
+
+    .social-links { display: flex; gap: 24px; }
+
+    .social-link {
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      color: var(--steel);
+      transition: color .2s;
+    }
+    .social-link:hover { color: var(--white); }
+
+    /* ===========================
+       FOOTER
+    =========================== */
+    .site-footer {
+      height: 46px;
+      background: var(--white);
       display: flex;
       align-items: center;
-      gap: 9px;
-      color: var(--dim);
-      text-decoration: none;
-      font-size: 10px;
-      letter-spacing: 3px;
-      text-transform: uppercase;
-      transition: color 0.2s;
-    }
-    .social:hover { color: #fff; }
-    .social svg { width: 16px; height: 16px; fill: currentColor; flex-shrink: 0; }
-
-    .footer-copy {
-      font-size: 9px;
-      letter-spacing: 3px;
-      color: var(--dimmer);
+      position: relative;
     }
 
-    /* ── Responsive ── */
+    .footer-name {
+      font-family: var(--mono);
+      font-weight: 700;
+      font-size: clamp(14px, 1.8vw, 26px);
+      color: var(--steel);
+      padding-left: 44px;
+    }
+
+    .footer-stripes {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      height: 100%;
+      display: flex;
+    }
+
+    .fs { display: block; width: 10px; height: 100%; }
+    .fs.black { background: var(--bg); }
+    .fs.blue  { background: var(--steel); }
+
+    /* ===========================
+       RESPONSIVE
+    =========================== */
+    @media (max-width: 900px) {
+      .universe-hub { grid-template-columns: 1fr; }
+      .hub-grid { grid-column: 1; }
+      .bracket-br { display: none; }
+    }
+
     @media (max-width: 600px) {
-      .projects { padding: 16px 20px 60px; }
-      .hud-label { display: none; }
-      header { padding: 70px 16px 40px; }
-      .socials { gap: 24px; }
+      .sidebar { display: none; }
+      .main-content { margin-left: 0; }
+
+      .hero { height: 480px; }
+      .hero-decos { top: 300px; }
+      .hero-title { top: 360px; font-size: 36px; }
+      .hero-tricolon { top: 424px; }
+      .hero-tagline { top: 434px; font-size: 12px; }
+      .bracket-tl { display: none; }
+
+      .hub-grid { grid-template-columns: 1fr 1fr; }
+
+      .stories-images { grid-template-columns: 1fr 1fr; height: auto; }
+      .story-img-panel { height: 180px; }
+
+      .stories-cta { grid-template-columns: 1fr 1fr; }
+
+      .quote-section { padding: 36px 24px 52px; }
+      .bracket-bl-red { left: 24px; }
+
+      .narrative-section { grid-template-columns: 1fr; }
+      .narrative-panel { display: none; }
+
+      .social-section { grid-template-columns: 1fr; }
+      .social-stripes { display: none; }
     }
+
   </style>
 </head>
 <body>
 
-<canvas id="bg-canvas"></canvas>
-<div class="scanlines"></div>
-<div class="vignette"></div>
-
-<!-- HUD frame -->
-<div class="hud-corner tl"></div>
-<div class="hud-corner tr"></div>
-<div class="hud-corner bl"></div>
-<div class="hud-corner br"></div>
-
-<div class="hud-label tl">
-  NEURONOMICON.WORLD<br>
-  <span class="blink">■</span>&nbsp;SIGNAL LOCKED
-</div>
-<div class="hud-label tr">
-  NODES ONLINE: <span id="hud-nodes">—</span><br>
-  STATUS: ACTIVE
-</div>
-<div class="hud-label bl">BUILD v1.0 &nbsp;/&nbsp; 2026</div>
-<div class="hud-label br" id="hud-cursor">X: ——&nbsp;&nbsp;Y: ——</div>
-
-<!-- ──────────────────────────────────── APP ── -->
-<div id="app">
-
-  <header>
-    <div class="logo-wrap">
-      <div class="logo" data-text="NEURONOMICON">NEURONOMICON</div>
+  <!-- ========================
+       SIDEBAR
+  ========================= -->
+  <aside class="sidebar" aria-hidden="true">
+    <div class="sidebar-star">✦</div>
+    <div class="sidebar-stripes">
+      <div class="stripe s-black"></div>
+      <div class="stripe s-blue"></div>
+      <div class="stripe s-black"></div>
+      <div class="stripe s-black"></div>
     </div>
-    <div class="logo-sub">Cinematic Universe</div>
-    <div class="logo-rule"></div>
-  </header>
+    <div class="sidebar-label">
+      <span class="sl-stardate">STARDATE</span><span class="sl-sep">:::</span><span class="sl-year">2233</span>
+    </div>
+  </aside>
 
-  <main class="projects">
-    <p class="section-header">Active Transmissions</p>
-    <div class="project-grid" id="grid"></div>
+  <!-- ========================
+       MAIN CONTENT
+  ========================= -->
+  <main class="main-content">
+
+    <!-- ── HERO ── -->
+    <section class="hero">
+
+      <div class="hero-topbar">
+        <div class="hero-topbar-red"></div>
+      </div>
+
+      <div class="hero-image-wrap">
+        <img src="assets/images/website01.png" alt="Neuronomicon" class="hero-img">
+      </div>
+
+      <div class="bracket-tl" aria-hidden="true"></div>
+
+      <div class="hero-decos" aria-hidden="true">
+        <span class="deco deco-plus">+</span>
+        <span class="deco deco-arrows">&gt;&gt;</span>
+        <span class="deco deco-slashes">///</span>
+      </div>
+
+      <h1 class="hero-title">NEURONOMICON</h1>
+
+      <span class="hero-tricolon" aria-hidden="true">:::</span>
+
+      <p class="hero-tagline">
+        Humanity built artificial gods to conquer the stars.<br>
+        They never explained why.
+      </p>
+
+    </section>
+
+
+    <!-- ── UNIVERSE HUB ── -->
+    <section class="universe-hub" aria-label="Universe">
+
+      <div class="hub-newsletter">
+        <div>
+          <p class="hub-label">NEWSLETTER</p>
+          <a href="https://www.theaivideocreator.ai/" class="hub-big-link" target="_blank" rel="noopener noreferrer">
+            BUILDING<br>A SCIFI UNIVERSE
+          </a>
+        </div>
+        <p class="hub-subtitle">Behind the scenes</p>
+        <div class="bracket-br" aria-hidden="true"></div>
+      </div>
+
+      <div class="hub-grid">
+        <a href="/wiki" class="hub-tile">
+          <span class="tricolon" aria-hidden="true">:::</span>
+          <span class="hub-tile-title">WIKI</span>
+          <span class="hub-tile-sub">THE HISTORY. THE PLANETS. THE STARSHIPS.</span>
+        </a>
+        <a href="/starmap" class="hub-tile">
+          <span class="tricolon" aria-hidden="true">:::</span>
+          <span class="hub-tile-title">STAR MAP</span>
+          <span class="hub-tile-sub">3D MAP OF THE SETTING</span>
+        </a>
+        <a href="/ilion" class="hub-tile">
+          <span class="tricolon" aria-hidden="true">:::</span>
+          <span class="hub-tile-title">ILION</span>
+          <span class="hub-tile-sub">THE RING AROUND A STAR</span>
+        </a>
+        <a href="https://www.youtube.com/@NeuronomiconTV" class="hub-tile" target="_blank" rel="noopener noreferrer">
+          <span class="tricolon" aria-hidden="true">:::</span>
+          <span class="hub-tile-title">FILMS</span>
+          <span class="hub-tile-sub">YOUTUBE</span>
+        </a>
+      </div>
+
+    </section>
+
+
+    <!-- ── STORY IMAGES ── -->
+    <div class="stories-images" aria-hidden="true">
+      <div class="story-img-panel">
+        <img src="assets/images/website02.png" alt="Star Wyrms">
+      </div>
+      <div class="story-img-panel">
+        <img src="assets/images/website03.png" alt="Grind Fighter">
+      </div>
+      <div class="story-img-panel">
+        <img src="assets/images/website04.png" alt="The AI God">
+      </div>
+      <div class="story-img-panel">
+        <img src="assets/images/website05.png" alt="Crusade">
+      </div>
+    </div>
+
+
+    <!-- ── STORIES CTA ── -->
+    <section class="stories-cta" aria-label="Stories">
+
+      <div class="story-col">
+        <p class="story-tagline">
+          They were built to be controlled weapons.<br>
+          They forgot Dragons can't be tamed.
+        </p>
+        <h2 class="story-title">STAR WYRMS</h2>
+        <div class="story-btn-row">
+          <span class="btn-stripe blue"></span>
+          <a href="https://www.royalroad.com/fiction/146773/star-wyrms-top-gun-attack-on-titan-space-dragons"
+             class="story-btn" target="_blank" rel="noopener noreferrer">READ ON ROYAL ROAD</a>
+        </div>
+      </div>
+
+      <div class="story-col">
+        <p class="story-tagline">
+          Become the monster and win<br>
+          the Grind tournament. Or die.
+        </p>
+        <h2 class="story-title">GRIND FIGHTER</h2>
+        <div class="story-btn-row">
+          <span class="btn-stripe black"></span>
+          <a href="https://www.royalroad.com/fiction/138724/grind-fighter-hunger-games-gladiator-ghost-in"
+             class="story-btn" target="_blank" rel="noopener noreferrer">READ ON ROYAL ROAD</a>
+        </div>
+      </div>
+
+      <div class="story-col">
+        <p class="story-tagline">
+          Humanity built a god in the machine.<br>
+          They thought they could control it.
+        </p>
+        <h2 class="story-title">THE AI GOD</h2>
+        <div class="story-btn-row">
+          <span class="btn-stripe blue"></span>
+          <button class="story-btn" disabled aria-disabled="true">COMING SOON</button>
+        </div>
+      </div>
+
+      <div class="story-col">
+        <p class="story-tagline">
+          THE HOLY WAR AGAINST THE MACHINES<br>
+          IS RAGING IN THE KNOWN GALAXY
+        </p>
+        <h2 class="story-title">CRUSADE</h2>
+        <div class="story-btn-row">
+          <span class="btn-stripe black"></span>
+          <button class="story-btn" disabled aria-disabled="true">COMING SOON</button>
+        </div>
+      </div>
+
+    </section>
+
+
+    <!-- ── QUOTE SECTION ── -->
+    <section class="quote-section">
+      <p class="quote-label">TWELVE SYNTHETIC GODS</p>
+      <blockquote class="quote-text">
+        They gave us the heavens,<br>
+        we never asked if it was right.
+      </blockquote>
+      <div class="bracket-bl-red" aria-hidden="true"></div>
+    </section>
+
+
+    <!-- ── NARRATIVE SECTION ── -->
+    <section class="narrative-section">
+
+      <div class="narrative-text-block">
+        <span class="tricolon" aria-hidden="true">:::</span>
+        <p class="narrative-body">
+          Humanity and their artificial gods<br>
+          conquered the stars together.<br>
+          <br>
+          neither side certain whether<br>
+          it was a partnership or a leash.
+        </p>
+      </div>
+
+      <div class="narrative-panel">
+        <div class="arrow-br" aria-hidden="true"></div>
+      </div>
+      <div class="narrative-panel"></div>
+
+    </section>
+
+
+    <!-- ── SOCIAL SECTION ── -->
+    <section class="social-section">
+
+      <div class="social-stripes" aria-hidden="true"></div>
+
+      <div class="social-content">
+        <span class="tricolon" aria-hidden="true">:::</span>
+        <h2 class="social-heading">SOCIAL MEDIA</h2>
+        <div class="social-links">
+          <a href="https://twitter.com/Erik_Knobl"
+             class="social-link" target="_blank" rel="noopener noreferrer">TWITTER / X</a>
+          <a href="https://www.youtube.com/@NeuronomiconTV"
+             class="social-link" target="_blank" rel="noopener noreferrer">YOUTUBE</a>
+        </div>
+      </div>
+
+    </section>
+
+
+    <!-- ── FOOTER ── -->
+    <footer class="site-footer">
+      <p class="footer-name">NEURONOMICON</p>
+      <div class="footer-stripes" aria-hidden="true">
+        <span class="fs black"></span>
+        <span class="fs black"></span>
+        <span class="fs blue"></span>
+        <span class="fs black"></span>
+      </div>
+    </footer>
+
   </main>
 
-  <footer>
-    <div class="footer-rule"></div>
-    <div class="socials">
-
-      <a class="social" href="https://x.com/Erik_Knobl" target="_blank" rel="noopener">
-        <!-- X / Twitter -->
-        <svg viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.746l7.73-8.835L1.254 2.25H8.08l4.253 5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
-        @Erik_Knobl
-      </a>
-
-      <a class="social" href="https://www.youtube.com/@NeuronomiconTV" target="_blank" rel="noopener">
-        <!-- YouTube -->
-        <svg viewBox="0 0 24 24"><path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/></svg>
-        NeuronomiconTV
-      </a>
-
-    </div>
-    <div class="footer-copy">© 2026 NEURONOMICON — ALL RIGHTS RESERVED</div>
-  </footer>
-
-</div><!-- /app -->
-
-<!-- ══════════════════════════════ SCRIPTS ══ -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script>
-'use strict';
-
-// ──────────────────────────────────────────────────────────────────
-//  DATA  — add projects here; the page is fully data-driven
-// ──────────────────────────────────────────────────────────────────
-const PROJECTS = [
-  {
-    id:      'NMC-001',
-    title:   'STAR WYRMS',
-    tagline: 'Top Gun × Attack on Titan × Space Dragons',
-    tags:    ['MILITARY SCI-FI', 'PROGRESSION', 'SPACE OPERA'],
-    color:   '#4fc3f7',   // sky-blue — orbital / aerial
-    url:     'https://www.royalroad.com/fiction/146773/star-wyrms-top-gun-attack-on-titan-space-dragons',
-    status:  'ONLINE',
-  },
-  {
-    id:      'NMC-002',
-    title:   'GRIND FIGHTER',
-    tagline: 'Hunger Games × Gladiator × Ghost in the Shell',
-    tags:    ['CYBERPUNK', 'ARENA', 'PROGRESSION'],
-    color:   '#ff8c42',   // ember-orange — arena fire
-    url:     'https://www.royalroad.com/fiction/138724/grind-fighter-hunger-games-gladiator-ghost-in',
-    status:  'ONLINE',
-  },
-  // Future entries — uncomment and fill when ready:
-  // {
-  //   id: 'NMC-003', title: 'PROJECT NAME', tagline: '...', tags: [],
-  //   color: '#a78bfa', url: null, status: 'INCOMING',
-  // },
-];
-
-
-// ──────────────────────────────────────────────────────────────────
-//  BUILD CARDS
-// ──────────────────────────────────────────────────────────────────
-const grid = document.getElementById('grid');
-
-PROJECTS.forEach(p => {
-  const online  = p.status === 'ONLINE';
-  const card    = document.createElement('div');
-  card.className = 'card' + (online ? '' : ' card--dim');
-  card.style.setProperty('--c', p.color);
-
-  const tags = p.tags.map(t => `<span class="tag">${t}</span>`).join('');
-  const btn  = online
-    ? `<a class="card-btn" href="${p.url}" target="_blank" rel="noopener">
-         READ <span class="arrow">→</span>
-       </a>`
-    : `<span class="card-btn" style="opacity:.3;cursor:default;pointer-events:none">
-         INCOMING <span class="arrow">—</span>
-       </span>`;
-
-  card.innerHTML = `
-    <div class="card-bar"></div>
-    <div class="card-status-row">
-      <div class="status-pill">
-        <div class="status-dot"></div>
-        <span class="status-text">${p.status}</span>
-      </div>
-      <div class="card-id">// ${p.id}</div>
-    </div>
-    <div class="card-title">${p.title}</div>
-    <div class="card-tagline">${p.tagline}</div>
-    <div class="tag-row">${tags}</div>
-    ${btn}
-  `;
-  grid.appendChild(card);
-});
-
-document.getElementById('hud-nodes').textContent =
-  PROJECTS.filter(p => p.status === 'ONLINE').length;
-
-
-// ──────────────────────────────────────────────────────────────────
-//  THREE.JS  — particle network WebGL background
-// ──────────────────────────────────────────────────────────────────
-const canvas   = document.getElementById('bg-canvas');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-renderer.setSize(window.innerWidth, window.innerHeight);
-renderer.setClearColor(0x000000, 0);
-
-const scene  = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 1000);
-camera.position.set(0, 0, 130);
-
-// -- Particles --
-const COUNT = 200;
-const posArr = new Float32Array(COUNT * 3);
-const vel    = [];
-
-for (let i = 0; i < COUNT; i++) {
-  posArr[i*3]   = (Math.random() - 0.5) * 320;
-  posArr[i*3+1] = (Math.random() - 0.5) * 210;
-  posArr[i*3+2] = (Math.random() - 0.5) * 110;
-  vel.push(
-    (Math.random() - 0.5) * 0.07,
-    (Math.random() - 0.5) * 0.07,
-    (Math.random() - 0.5) * 0.025
-  );
-}
-
-const ptGeo = new THREE.BufferGeometry();
-ptGeo.setAttribute('position', new THREE.BufferAttribute(posArr, 3));
-
-const ptMat = new THREE.PointsMaterial({
-  color: 0xffffff,
-  size: 0.9,
-  transparent: true,
-  opacity: 0.65,
-  sizeAttenuation: true,
-});
-
-scene.add(new THREE.Points(ptGeo, ptMat));
-
-// -- Lines --
-const LINK_DIST = 55;
-const lineMat = new THREE.LineBasicMaterial({
-  color: 0xffffff,
-  transparent: true,
-  opacity: 0.07,
-});
-
-let lineObj = null;
-
-function rebuildLines() {
-  const p   = posArr;
-  const pts = [];
-
-  for (let i = 0; i < COUNT; i++) {
-    for (let j = i + 1; j < COUNT; j++) {
-      const dx = p[i*3]   - p[j*3];
-      const dy = p[i*3+1] - p[j*3+1];
-      const dz = p[i*3+2] - p[j*3+2];
-      if (dx*dx + dy*dy + dz*dz < LINK_DIST * LINK_DIST) {
-        pts.push(p[i*3], p[i*3+1], p[i*3+2],
-                 p[j*3], p[j*3+1], p[j*3+2]);
-      }
-    }
-  }
-
-  if (lineObj) {
-    scene.remove(lineObj);
-    lineObj.geometry.dispose();
-  }
-  const geo = new THREE.BufferGeometry();
-  geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pts), 3));
-  lineObj = new THREE.LineSegments(geo, lineMat);
-  scene.add(lineObj);
-}
-
-// -- Mouse parallax --
-let mx = 0, my = 0;
-const hudCursor = document.getElementById('hud-cursor');
-
-window.addEventListener('mousemove', e => {
-  mx = (e.clientX / window.innerWidth  - 0.5) * 2;
-  my = (e.clientY / window.innerHeight - 0.5) * 2;
-  hudCursor.textContent =
-    'X: ' + String(e.clientX).padStart(4,'0') +
-    '  Y: ' + String(e.clientY).padStart(4,'0');
-});
-
-// -- Animate --
-let frame = 0;
-(function animate() {
-  requestAnimationFrame(animate);
-  frame++;
-
-  const p = posArr;
-  for (let i = 0; i < COUNT; i++) {
-    p[i*3]   += vel[i*3];
-    p[i*3+1] += vel[i*3+1];
-    p[i*3+2] += vel[i*3+2];
-
-    if (p[i*3]   >  160) p[i*3]   = -160;
-    if (p[i*3]   < -160) p[i*3]   =  160;
-    if (p[i*3+1] >  105) p[i*3+1] = -105;
-    if (p[i*3+1] < -105) p[i*3+1] =  105;
-    if (p[i*3+2] >   55) p[i*3+2] =  -55;
-    if (p[i*3+2] <  -55) p[i*3+2] =   55;
-  }
-  ptGeo.attributes.position.needsUpdate = true;
-
-  if (frame % 4 === 0) rebuildLines();
-
-  camera.position.x += (mx * 18 - camera.position.x) * 0.018;
-  camera.position.y += (-my * 12 - camera.position.y) * 0.018;
-  camera.lookAt(scene.position);
-
-  renderer.render(scene, camera);
-})();
-
-// -- Resize --
-window.addEventListener('resize', () => {
-  camera.aspect = window.innerWidth / window.innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(window.innerWidth, window.innerHeight);
-});
-</script>
 </body>
 </html>
